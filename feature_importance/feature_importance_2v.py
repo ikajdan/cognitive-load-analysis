@@ -27,6 +27,7 @@ from models.transformer import FeatureGroupTransformerModel
 
 
 
+
 channel_mapping = {
      1: 'FT7',  2: 'FT8',  3: 'T7',  4: 'T8',  5: 'TP7',  6: 'TP8',
      7: 'CP1',  8: 'CP2',  9: 'P1', 10: 'Pz', 11: 'P2', 12: 'PO3',
@@ -164,7 +165,7 @@ def plot_channel_importance_topomap(importances, title=None, cmap=common_cmap):
     data = np.array(list(importances.values()))
     pos = np.array([pos_dict[n][:2] for n in names])
     fig, ax = plt.subplots(figsize=(6,6), subplot_kw={'aspect':'equal'})
-    im, _ = plot_topomap(data, pos, axes=ax, show=False, names=names, cmap=cmap, extrapolate='local')
+    im, _ = plot_topomap(data, pos, axes=ax, show=False, names=names, cmap=cmap, extrapolate='auto')
     if title:
         ax.set_title(title)
     ax.axis('off')
@@ -176,22 +177,43 @@ def plot_channel_importance_topomap(importances, title=None, cmap=common_cmap):
     return fig
 
 if __name__=='__main__':
-    model_type = 'transformer'  
+    model_type = 'mlp'  # 'mlp', 'cnn', or 'transformer'
+
     feat_imp, group_imp, info, feature_names = compute_model_importances(
         all_data=all_participants_data,
         model_type=model_type,
         task_type='binary',
         batch_size=128,
         learning_rate=1e-4,
-        quick_train_epochs=2,
+        quick_train_epochs=1,
         shap_nsamples=100,
         subject_calibration=0.0
     )
 
     feature_groups = create_token_groups(all_participants_data)
 
+    # rename feature_names
+    renamed_feature_names = []
+    for name in feature_names:
+        m = re.search(r'ch(\d+)', name)
+        if m:
+            lbl = channel_mapping[int(m.group(1))]
+            renamed_feature_names.append(name.replace(f'ch{m.group(1)}', lbl))
+        else:
+            renamed_feature_names.append(name)
+    feature_names = renamed_feature_names
 
-
+    # rename feature_groups keys
+    renamed_feature_groups = {}
+    for nm, (st, sz) in feature_groups.items():
+        m = re.search(r'ch(\d+)', nm)
+        if m:
+            lbl = channel_mapping[int(m.group(1))]
+            new_nm = nm.replace(f'ch{m.group(1)}', lbl)
+        else:
+            new_nm = nm
+        renamed_feature_groups[new_nm] = (st, sz)
+    feature_groups = renamed_feature_groups
 
     if model_type=='mlp':
         shap_vals, Xts = info
@@ -239,19 +261,12 @@ if __name__=='__main__':
         attn = info
         corr = np.corrcoef(attn, rowvar=False)
         plt.figure(figsize=(16,12))
-        sns.heatmap(
-            corr,
-            xticklabels=list(feature_groups.keys()),
-            yticklabels=list(feature_groups.keys()),
-            cmap=common_cmap,
-            center=0
-        )
+        sns.heatmap(corr, xticklabels=list(feature_groups.keys()), yticklabels=list(feature_groups.keys()), cmap=common_cmap, center=0)
         plt.title("Transformer Attention Correlation Matrix")
         plt.xticks(rotation=90)
         plt.yticks(rotation=0)
         plt.tight_layout()
         plt.show()
-
         group_att = attn.mean(axis=0)
         names, vals = zip(*sorted(zip(feature_groups.keys(), group_att), key=lambda x: -x[1]))
         plt.figure(figsize=(12,9))
@@ -259,14 +274,6 @@ if __name__=='__main__':
         plt.title("Top Attention Groups")
         plt.tight_layout()
         plt.show()
-
-        feat_att = np.zeros(len(feature_names))
-        for i, (_, (st, sz)) in enumerate(feature_groups.items()):
-            feat_att[st:st+sz] = group_att[i] / sz
-        imp5_att, imp2_att = compute_channel_importances(feat_att, feature_names)
-        imp_combined_att = {ch: (imp5_att[ch] + imp2_att[ch]) / 2 for ch in imp5_att}
-
-        plot_channel_importance_topomap(
-            imp_combined_att,
-            'Transformer EEG Topomap'
-        )
+        imp5, imp2 = compute_channel_importances(feat_imp, feature_names)
+        imp_combined = {ch: (imp5[ch] + imp2[ch]) / 2 for ch in imp5}
+        plot_channel_importance_topomap(imp_combined, 'Transformer EEG Topomap')
