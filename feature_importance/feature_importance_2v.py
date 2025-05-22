@@ -191,34 +191,6 @@ if __name__=='__main__':
     feature_groups = create_token_groups(all_participants_data)
 
 
-    renamed_feature_names = []
-    for name in feature_names:
-        if name.startswith('Forehead_'):
-            renamed_feature_names.append(name)
-        else:
-            m = re.search(r'Channel_(\d+)', name)
-            if m:
-                num = int(m.group(1))
-                lbl = channel_mapping[num]
-                renamed_feature_names.append(name.replace(f'Channel_{num}', lbl))
-            else:
-                renamed_feature_names.append(name)
-    feature_names = renamed_feature_names
-
-    renamed_feature_groups = {}
-    for nm, (st, sz) in feature_groups.items():
-        if nm.startswith('Forehead_'):
-            new_nm = nm
-        else:
-            m = re.search(r'Channel_(\d+)', nm)
-            if m:
-                num = int(m.group(1))
-                lbl = channel_mapping[num]
-                new_nm = nm.replace(f'Channel_{num}', lbl)
-            else:
-                new_nm = nm
-        renamed_feature_groups[new_nm] = (st, sz)
-    feature_groups = renamed_feature_groups
 
 
     if model_type=='mlp':
