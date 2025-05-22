@@ -14,6 +14,18 @@ from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 from tqdm.auto import tqdm
 
+from imports import *
+from models.additional import (
+    all_participants_data,   
+    create_token_groups,
+    create_torch_dataset,
+    prepare_data_for_pytorch
+)
+from models.mlp import MLPModel
+from models.cnn import MultiHeadConv1DModel
+from models.transformer import FeatureGroupTransformerModel
+
+
 
 channel_mapping = {
      1: 'FT7',  2: 'FT8',  3: 'T7',  4: 'T8',  5: 'TP7',  6: 'TP8',
@@ -179,24 +191,24 @@ if __name__=='__main__':
     feature_groups = create_token_groups(all_participants_data)
 
 
-    # rename feature_names
     renamed_feature_names = []
     for name in feature_names:
-        m = re.search(r'ch(\d+)', name)
+        m = re.search(r'Channel_(\d+)', name)
         if m:
-            lbl = channel_mapping[int(m.group(1))]
-            renamed_feature_names.append(name.replace(f'ch{m.group(1)}', lbl))
+            num = int(m.group(1))
+            lbl = channel_mapping[num]
+            renamed_feature_names.append(name.replace(f'Channel_{num}', lbl))
         else:
             renamed_feature_names.append(name)
     feature_names = renamed_feature_names
 
-    # rename feature_groups keys
     renamed_feature_groups = {}
     for nm, (st, sz) in feature_groups.items():
-        m = re.search(r'ch(\d+)', nm)
+        m = re.search(r'Channel_(\d+)', nm)
         if m:
-            lbl = channel_mapping[int(m.group(1))]
-            new_nm = nm.replace(f'ch{m.group(1)}', lbl)
+            num = int(m.group(1))
+            lbl = channel_mapping[num]
+            new_nm = nm.replace(f'Channel_{num}', lbl)
         else:
             new_nm = nm
         renamed_feature_groups[new_nm] = (st, sz)
